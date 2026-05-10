@@ -60,6 +60,7 @@ function HomePage() {
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string | null>(null);
 
   useEffect(() => {
     // log access
