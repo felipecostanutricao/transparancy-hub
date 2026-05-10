@@ -10,24 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as BuscaRouteImport } from './routes/busca'
-import { Route as AlertasRouteImport } from './routes/alertas'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BuscaRoute = BuscaRouteImport.update({
-  id: '/busca',
-  path: '/busca',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AlertasRoute = AlertasRouteImport.update({
-  id: '/alertas',
-  path: '/alertas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -44,38 +32,30 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/alertas': typeof AlertasRoute
-  '/busca': typeof BuscaRoute
   '/login': typeof LoginRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/alertas': typeof AlertasRoute
-  '/busca': typeof BuscaRoute
   '/login': typeof LoginRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/alertas': typeof AlertasRoute
-  '/busca': typeof BuscaRoute
   '/login': typeof LoginRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/alertas' | '/busca' | '/login'
+  fullPaths: '/' | '/admin' | '/login'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/alertas' | '/busca' | '/login'
-  id: '__root__' | '/' | '/admin' | '/alertas' | '/busca' | '/login'
+  to: '/' | '/admin' | '/login'
+  id: '__root__' | '/' | '/admin' | '/login'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
-  AlertasRoute: typeof AlertasRoute
-  BuscaRoute: typeof BuscaRoute
   LoginRoute: typeof LoginRoute
 }
 
@@ -86,20 +66,6 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/busca': {
-      id: '/busca'
-      path: '/busca'
-      fullPath: '/busca'
-      preLoaderRoute: typeof BuscaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/alertas': {
-      id: '/alertas'
-      path: '/alertas'
-      fullPath: '/alertas'
-      preLoaderRoute: typeof AlertasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -122,10 +88,18 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
-  AlertasRoute: AlertasRoute,
-  BuscaRoute: BuscaRoute,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
