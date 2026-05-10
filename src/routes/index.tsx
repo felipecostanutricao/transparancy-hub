@@ -178,16 +178,46 @@ function HomePage() {
           </span>
         </div>
 
+        {/* Filtro de categoria dinâmico */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Categoria:</span>
+          <button
+            type="button"
+            onClick={() => setCategoriaFiltro("__all__")}
+            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+              categoriaFiltro === "__all__"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border hover:border-primary/50"
+            }`}
+          >
+            Todas
+          </button>
+          {categorias.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCategoriaFiltro(c)}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                categoriaFiltro === c
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border hover:border-primary/50"
+              }`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+
         {/* Cards resumo */}
         <section className="grid gap-4 sm:grid-cols-3">
           <SummaryCard
-            label="Total empenhado"
-            value={fmt(total)}
+            label="Gasto total"
+            value={fmt(totalAgregado)}
             icon={TrendingUp}
           />
           <SummaryCard
             label="Empenhos registrados"
-            value={String(despesas.length)}
+            value={new Intl.NumberFormat("pt-BR").format(countAgregado)}
             icon={Receipt}
           />
           <SummaryCard
