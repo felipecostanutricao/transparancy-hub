@@ -138,6 +138,7 @@ export function CsvUpload() {
       Papa.parse<Record<string, string>>(file, {
         header: true,
         skipEmptyLines: true,
+        delimitersToGuess: [",", ";", "\t", "|"],
         complete: ({ data }) => processRows(data),
         error: (err) => {
           toast.error(err.message);
