@@ -46,68 +46,90 @@ export function CsvUpload() {
     setProcessing(true);
     setResult(null);
 
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async ({ data }) => {
-        try {
-          const rows: Row[] = data
-            .filter((r) => r.id_empenho && r.id_empenho.trim() !== "")
-            .map((r) => ({
-              id_empenho: r.id_empenho.trim(),
-              data_despesa: r.data_despesa || null,
-              categoria: r.categoria || null,
-              favorecido: r.favorecido || null,
-              valor: r.valor ? Number(String(r.valor).replace(",", ".")) : null,
-              fonte_tabela: r.fonte_tabela || "csv_upload",
-            }));
+    const processRows = async (raw: Record<string, unknown>[]) => {
+      try {
+        const rows: Row[] = raw
+          .filter((r) => r.id_empenho != null && String(r.id_empenho).trim() !== "")
+          .map((r) => ({
+            id_empenho: String(r.id_empenho).trim(),
+            data_despesa: r.data_despesa ? String(r.data_despesa) : null,
+            categoria: r.categoria ? String(r.categoria) : null,
+            favorecido: r.favorecido ? String(r.favorecido) : null,
+            valor:
+              r.valor != null && r.valor !== ""
+                ? Number(String(r.valor).replace(",", "."))
+                : null,
+            fonte_tabela: r.fonte_tabela ? String(r.fonte_tabela) : "csv_upload",
+          }));
 
-          if (rows.length === 0) {
-            toast.error("Nenhuma linha válida (verifique a coluna id_empenho).");
-            return;
-          }
-
-          const ids = rows.map((r) => r.id_empenho);
-          const { data: existing } = await supabase
-            .from("despesas_cfn")
-            .select("id_empenho")
-            .in("id_empenho", ids);
-          const existingSet = new Set((existing ?? []).map((e) => e.id_empenho));
-
-          const { error } = await supabase
-            .from("despesas_cfn")
-            .upsert(rows, { onConflict: "id_empenho" });
-          if (error) throw error;
-
-          const atualizados = rows.filter((r) => existingSet.has(r.id_empenho)).length;
-          const novos = rows.length - atualizados;
-          const novosRows = rows.filter((r) => !existingSet.has(r.id_empenho));
-          const valorTotal = rows.reduce((sum, r) => sum + (Number(r.valor) || 0), 0);
-          setResult({
-            novos,
-            atualizados,
-            totalLinhas: rows.length,
-            valorTotal,
-            primeirosNovos: novosRows.slice(0, 5),
-          });
-          toast.success("CSV processado com sucesso");
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : "Erro no upload";
-          toast.error(msg);
-        } finally {
-          setProcessing(false);
+        if (rows.length === 0) {
+          toast.error("Nenhuma linha válida (verifique a coluna id_empenho).");
+          return;
         }
-      },
-      error: (err) => {
-        toast.error(err.message);
+
+        const ids = rows.map((r) => r.id_empenho);
+        const { data: existing } = await supabase
+          .from("despesas_cfn")
+          .select("id_empenho")
+          .in("id_empenho", ids);
+        const existingSet = new Set((existing ?? []).map((e) => e.id_empenho));
+
+        const { error } = await supabase
+          .from("despesas_cfn")
+          .upsert(rows, { onConflict: "id_empenho" });
+        if (error) throw error;
+
+        const atualizados = rows.filter((r) => existingSet.has(r.id_empenho)).length;
+        const novos = rows.length - atualizados;
+        const novosRows = rows.filter((r) => !existingSet.has(r.id_empenho));
+        const valorTotal = rows.reduce((sum, r) => sum + (Number(r.valor) || 0), 0);
+        setResult({
+          novos,
+          atualizados,
+          totalLinhas: rows.length,
+          valorTotal,
+          primeirosNovos: novosRows.slice(0, 5),
+        });
+        toast.success("Arquivo processado com sucesso");
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Erro no upload";
+        toast.error(msg);
+      } finally {
         setProcessing(false);
-      },
-    });
+      }
+    };
+
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext === "xlsx") {
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+        await processRows(json);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Erro ao ler XLSX");
+        setProcessing(false);
+      }
+    } else {
+      Papa.parse<Record<string, string>>(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: ({ data }) => processRows(data),
+        error: (err) => {
+          toast.error(err.message);
+          setProcessing(false);
+        },
+      });
+    }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { "text/csv": [".csv"] },
+    accept: {
+      "text/csv": [".csv"],
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+    },
     multiple: false,
   });
 
