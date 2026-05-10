@@ -28,7 +28,7 @@ import {
 import { DataSourceInfo } from "@/components/DataSourceInfo";
 import { CommentForm } from "@/components/CommentForm";
 import { CommentList } from "@/components/CommentList";
-import { ShieldCheck, TrendingUp, Receipt, PieChart as PieIcon, Lock, Info } from "lucide-react";
+import { ShieldCheck, TrendingUp, Receipt, PieChart as PieIcon, Lock, Info, Mail } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -294,6 +294,18 @@ function HomePage() {
           <CommentList refreshKey={refreshKey} />
         </section>
       </div>
+
+      <footer className="mt-12 border-t bg-card/50 py-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-center px-4">
+          <a
+            href="mailto:nutriservidor@gmail.com"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
+          >
+            <Mail className="h-4 w-4" />
+            Contato
+          </a>
+        </div>
+      </footer>
     </main>
   );
 }
