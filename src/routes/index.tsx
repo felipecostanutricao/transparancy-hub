@@ -294,6 +294,18 @@ function HomePage() {
           <CommentList refreshKey={refreshKey} />
         </section>
       </div>
+
+      <footer className="mt-12 border-t bg-card/50 py-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-center px-4">
+          <a
+            href="mailto:nutriservidor@gmail.com"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
+          >
+            <Mail className="h-4 w-4" />
+            Contato
+          </a>
+        </div>
+      </footer>
     </main>
   );
 }
