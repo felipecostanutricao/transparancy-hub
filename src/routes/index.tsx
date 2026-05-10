@@ -61,20 +61,55 @@ function HomePage() {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string | null>(null);
+  const [categorias, setCategorias] = useState<string[]>([]);
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>("__all__");
+  const [totalAgregado, setTotalAgregado] = useState<number>(0);
+  const [countAgregado, setCountAgregado] = useState<number>(0);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
-    // log access
     supabase.from("log_acessos").insert({}).then(() => {});
+  }, []);
 
-    supabase
+  useEffect(() => {
+    let q = supabase
       .from("despesas_cfn")
       .select("id_empenho, categoria, favorecido, valor, data_despesa, fonte_tabela")
       .order("data_despesa", { ascending: false })
-      .limit(500)
+      .limit(500);
+    if (categoriaFiltro !== "__all__") q = q.eq("categoria", categoriaFiltro);
+    q.then(({ data }) => {
+      setDespesas((data as Despesa[]) ?? []);
+      setLoading(false);
+    });
+
+    // Distinct categorias (deduped client-side)
+    supabase
+      .from("despesas_cfn")
+      .select("categoria")
+      .not("categoria", "is", null)
+      .limit(5000)
       .then(({ data }) => {
-        setDespesas((data as Despesa[]) ?? []);
-        setLoading(false);
+        const set = new Set<string>();
+        (data ?? []).forEach((r: { categoria: string | null }) => {
+          if (r.categoria) set.add(r.categoria);
+        });
+        setCategorias(Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR")));
       });
+
+    // Aggregates: sum(valor) + count via head/exact
+    let aggQ = supabase.from("despesas_cfn").select("valor.sum()");
+    if (categoriaFiltro !== "__all__") aggQ = aggQ.eq("categoria", categoriaFiltro);
+    aggQ.then(({ data }) => {
+      const row = (data as Array<{ sum: number | null }> | null)?.[0];
+      setTotalAgregado(Number(row?.sum ?? 0));
+    });
+
+    let countQ = supabase
+      .from("despesas_cfn")
+      .select("id_empenho", { count: "exact", head: true });
+    if (categoriaFiltro !== "__all__") countQ = countQ.eq("categoria", categoriaFiltro);
+    countQ.then(({ count }) => setCountAgregado(count ?? 0));
 
     supabase
       .from("despesas_cfn")
@@ -85,21 +120,25 @@ function HomePage() {
         const d = data?.[0]?.atualizado_em;
         if (d) setUltimaAtualizacao(d);
       });
+  }, [categoriaFiltro, reloadTick]);
+
+  useEffect(() => {
+    const onUpd = () => setReloadTick((t) => t + 1);
+    window.addEventListener("despesas:updated", onUpd);
+    return () => window.removeEventListener("despesas:updated", onUpd);
   }, []);
 
-  const { porCategoria, total, maiorCat } = useMemo(() => {
+  const { porCategoria, maiorCat } = useMemo(() => {
     const map = new Map<string, number>();
-    let t = 0;
     for (const d of despesas) {
       const v = Number(d.valor ?? 0);
       const c = d.categoria || "Sem categoria";
       map.set(c, (map.get(c) ?? 0) + v);
-      t += v;
     }
     const arr = Array.from(map.entries())
       .map(([categoria, valor]) => ({ categoria, valor }))
       .sort((a, b) => b.valor - a.valor);
-    return { porCategoria: arr, total: t, maiorCat: arr[0] };
+    return { porCategoria: arr, maiorCat: arr[0] };
   }, [despesas]);
 
   return (
@@ -139,16 +178,46 @@ function HomePage() {
           </span>
         </div>
 
+        {/* Filtro de categoria dinâmico */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Categoria:</span>
+          <button
+            type="button"
+            onClick={() => setCategoriaFiltro("__all__")}
+            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+              categoriaFiltro === "__all__"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border hover:border-primary/50"
+            }`}
+          >
+            Todas
+          </button>
+          {categorias.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCategoriaFiltro(c)}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                categoriaFiltro === c
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border hover:border-primary/50"
+              }`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+
         {/* Cards resumo */}
         <section className="grid gap-4 sm:grid-cols-3">
           <SummaryCard
-            label="Total empenhado"
-            value={fmt(total)}
+            label="Gasto total"
+            value={fmt(totalAgregado)}
             icon={TrendingUp}
           />
           <SummaryCard
             label="Empenhos registrados"
-            value={String(despesas.length)}
+            value={new Intl.NumberFormat("pt-BR").format(countAgregado)}
             icon={Receipt}
           />
           <SummaryCard
