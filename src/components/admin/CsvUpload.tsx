@@ -46,9 +46,32 @@ export function CsvUpload() {
     setProcessing(true);
     setResult(null);
 
+    const normalizeKey = (k: string) =>
+      k
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "_");
+
+    const ID_KEYS = ["id_empenho", "numero_do_empenho", "empenho", "documento_resumo"];
+
+    const normalizeRow = (r: Record<string, unknown>): Record<string, unknown> => {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(r)) {
+        out[normalizeKey(String(k))] = v;
+      }
+      const idVal = ID_KEYS.map((k) => out[k]).find(
+        (v) => v != null && String(v).trim() !== "",
+      );
+      if (idVal != null) out.id_empenho = idVal;
+      return out;
+    };
+
     const processRows = async (raw: Record<string, unknown>[]) => {
       try {
-        const rows: Row[] = raw
+        const normalized = raw.map(normalizeRow);
+        const rows: Row[] = normalized
           .filter((r) => r.id_empenho != null && String(r.id_empenho).trim() !== "")
           .map((r) => ({
             id_empenho: String(r.id_empenho).trim(),
