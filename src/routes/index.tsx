@@ -129,6 +129,16 @@ function HomePage() {
       </header>
 
       <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Info className="h-4 w-4 text-primary" />
+          <span>
+            Base atualizada em:{" "}
+            {ultimaAtualizacao
+              ? new Date(ultimaAtualizacao).toLocaleString("pt-BR")
+              : "—"}
+          </span>
+        </div>
+
         {/* Cards resumo */}
         <section className="grid gap-4 sm:grid-cols-3">
           <SummaryCard
