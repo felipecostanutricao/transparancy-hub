@@ -50,6 +50,39 @@ export type Database = {
         }
         Relationships: []
       }
+      comentarios_nutri: {
+        Row: {
+          comentario: string
+          criado_em: string | null
+          crn: string
+          email: string
+          id: string
+          nome: string
+          status_moderacao: string | null
+          termo_aceite: boolean
+        }
+        Insert: {
+          comentario: string
+          criado_em?: string | null
+          crn: string
+          email: string
+          id?: string
+          nome: string
+          status_moderacao?: string | null
+          termo_aceite: boolean
+        }
+        Update: {
+          comentario?: string
+          criado_em?: string | null
+          crn?: string
+          email?: string
+          id?: string
+          nome?: string
+          status_moderacao?: string | null
+          termo_aceite?: boolean
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           author: string
@@ -101,6 +134,36 @@ export type Database = {
           origin_city?: string | null
           payment_date?: string | null
           person_name?: string
+        }
+        Relationships: []
+      }
+      despesas_cfn: {
+        Row: {
+          atualizado_em: string | null
+          categoria: string | null
+          data_despesa: string | null
+          favorecido: string | null
+          fonte_tabela: string | null
+          id_empenho: string
+          valor: number | null
+        }
+        Insert: {
+          atualizado_em?: string | null
+          categoria?: string | null
+          data_despesa?: string | null
+          favorecido?: string | null
+          fonte_tabela?: string | null
+          id_empenho: string
+          valor?: number | null
+        }
+        Update: {
+          atualizado_em?: string | null
+          categoria?: string | null
+          data_despesa?: string | null
+          favorecido?: string | null
+          fonte_tabela?: string | null
+          id_empenho?: string
+          valor?: number | null
         }
         Relationships: []
       }
@@ -191,6 +254,24 @@ export type Database = {
           ValorAjuste?: string | null
           ValorTotal?: string | null
           ValorUnitario?: string | null
+        }
+        Relationships: []
+      }
+      log_acessos: {
+        Row: {
+          data_acesso: string | null
+          hora_acesso: string | null
+          id: string
+        }
+        Insert: {
+          data_acesso?: string | null
+          hora_acesso?: string | null
+          id?: string
+        }
+        Update: {
+          data_acesso?: string | null
+          hora_acesso?: string | null
+          id?: string
         }
         Relationships: []
       }
