@@ -28,7 +28,7 @@ import {
 import { DataSourceInfo } from "@/components/DataSourceInfo";
 import { CommentForm } from "@/components/CommentForm";
 import { CommentList } from "@/components/CommentList";
-import { ShieldCheck, TrendingUp, Receipt, PieChart as PieIcon, Lock } from "lucide-react";
+import { ShieldCheck, TrendingUp, Receipt, PieChart as PieIcon, Lock, Info } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
