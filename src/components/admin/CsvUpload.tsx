@@ -27,7 +27,13 @@ interface Row {
 interface Result {
   novos: number;
   atualizados: number;
+  totalLinhas: number;
+  valorTotal: number;
+  primeirosNovos: Row[];
 }
+
+const fmtBRL = (n: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
 
 export function CsvUpload() {
   const [processing, setProcessing] = useState(false);
