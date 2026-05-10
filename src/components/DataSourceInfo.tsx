@@ -36,6 +36,14 @@ export function DataSourceInfo({ table, description, columns }: Props) {
             Colunas: {columns.join(", ")}
           </p>
         )}
+        <a
+          href="https://transparencia.cfn.org.br/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-block text-xs font-medium text-primary underline underline-offset-2 hover:text-primary/80"
+        >
+          Ir para o Portal da Transparência do CFN
+        </a>
       </PopoverContent>
     </Popover>
   );
