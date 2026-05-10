@@ -80,7 +80,15 @@ export function CsvUpload() {
 
           const atualizados = rows.filter((r) => existingSet.has(r.id_empenho)).length;
           const novos = rows.length - atualizados;
-          setResult({ novos, atualizados });
+          const novosRows = rows.filter((r) => !existingSet.has(r.id_empenho));
+          const valorTotal = rows.reduce((sum, r) => sum + (Number(r.valor) || 0), 0);
+          setResult({
+            novos,
+            atualizados,
+            totalLinhas: rows.length,
+            valorTotal,
+            primeirosNovos: novosRows.slice(0, 5),
+          });
           toast.success("CSV processado com sucesso");
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Erro no upload";
