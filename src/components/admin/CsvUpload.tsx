@@ -68,22 +68,45 @@ export function CsvUpload() {
       return out;
     };
 
+    const detectFonte = (headers: string[]): string => {
+      const joined = headers.join(" ").toLowerCase();
+      if (/passage|passagem|trecho|cia[_ ]?aerea|companhia[_ ]?aerea/.test(joined))
+        return "Viagens";
+      if (/remunera|sal[aá]rio|folha|vencimento|pessoal/.test(joined))
+        return "Pessoal";
+      return "csv_upload";
+    };
+
+    const NA = "Não Informado";
+
     const processRows = async (raw: Record<string, unknown>[]) => {
       try {
         const normalized = raw.map(normalizeRow);
+        const headers = normalized[0] ? Object.keys(normalized[0]) : [];
+        const fonteDetectada = detectFonte(headers);
+
         const rows: Row[] = normalized
           .filter((r) => r.id_empenho != null && String(r.id_empenho).trim() !== "")
-          .map((r) => ({
-            id_empenho: String(r.id_empenho).trim(),
-            data_despesa: r.data_despesa ? String(r.data_despesa) : null,
-            categoria: r.categoria ? String(r.categoria) : null,
-            favorecido: r.favorecido ? String(r.favorecido) : null,
-            valor:
+          .map((r) => {
+            const valorRaw =
               r.valor != null && r.valor !== ""
-                ? Number(String(r.valor).replace(",", "."))
-                : null,
-            fonte_tabela: r.fonte_tabela ? String(r.fonte_tabela) : "csv_upload",
-          }));
+                ? Number(String(r.valor).replace(/\./g, "").replace(",", "."))
+                : null;
+            return {
+              id_empenho: String(r.id_empenho).trim(),
+              data_despesa: r.data_despesa ? String(r.data_despesa) : null,
+              categoria:
+                r.categoria && String(r.categoria).trim() !== ""
+                  ? String(r.categoria)
+                  : NA,
+              favorecido:
+                r.favorecido && String(r.favorecido).trim() !== ""
+                  ? String(r.favorecido)
+                  : NA,
+              valor: valorRaw != null && !Number.isNaN(valorRaw) ? valorRaw : 0,
+              fonte_tabela: r.fonte_tabela ? String(r.fonte_tabela) : fonteDetectada,
+            };
+          });
 
         if (rows.length === 0) {
           toast.error("Nenhuma linha válida (verifique a coluna id_empenho).");
@@ -113,7 +136,10 @@ export function CsvUpload() {
           valorTotal,
           primeirosNovos: novosRows.slice(0, 5),
         });
-        toast.success("Arquivo processado com sucesso");
+        toast.success(`Arquivo processado (fonte: ${fonteDetectada})`);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("despesas:updated"));
+        }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Erro no upload";
         toast.error(msg);
