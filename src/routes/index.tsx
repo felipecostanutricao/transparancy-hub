@@ -1,395 +1,305 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
-  Cell,
-  Pie,
-  PieChart,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
   ResponsiveContainer,
-  Tooltip as RTooltip,
+  PieChart,
+  Pie,
+  Cell,
+  CartesianGrid,
+  Legend,
 } from "recharts";
-import {
-  Wallet,
-  Plane,
-  Briefcase,
-  HelpCircle,
-  ChevronDown,
-  Building2,
-  GraduationCap,
-  Cog,
-  ShieldCheck,
-  Calendar,
-} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { transactions, type Transaction } from "@/lib/transactions";
-import { cn } from "@/lib/utils";
-import { BottomNav } from "@/components/BottomNav";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { DataSourceInfo } from "@/components/DataSourceInfo";
+import { CommentForm } from "@/components/CommentForm";
+import { CommentList } from "@/components/CommentList";
+import { Leaf, TrendingUp, Receipt, PieChart as PieIcon, Lock } from "lucide-react";
 
 export const Route = createFileRoute("/")({
-  component: Dashboard,
   head: () => ({
     meta: [
       { title: "Portal de Transparência CFN" },
-      {
-        name: "description",
-        content:
-          "Portal de Transparência do Conselho Federal de Nutrição — gestão de recursos e prestação de contas para a categoria.",
-      },
+      { name: "description", content: "Acompanhe as despesas do Conselho Federal de Nutricionistas com transparência radical." },
+      { property: "og:title", content: "Portal de Transparência CFN" },
+      { property: "og:description", content: "Despesas, comentários da comunidade e dados abertos do CFN." },
     ],
   }),
+  component: HomePage,
 });
 
-const BRL = (v: number) =>
-  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-
-const CATEGORY_ICONS: Record<string, typeof Plane> = {
-  "Diárias e Passagens": Plane,
-  "Serviços de Terceiros": Cog,
-  "Eventos e Capacitação": GraduationCap,
-};
-
-const PALETTE = [
-  "var(--color-primary)",
-  "oklch(0.72 0.14 160)",
-  "oklch(0.85 0.10 160)",
-  "oklch(0.45 0.10 160)",
-];
-
-function InfoPop({ text }: { text: string }) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          aria-label="Origem do dado"
-          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-        >
-          <HelpCircle className="h-4 w-4" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-72 text-sm leading-relaxed">
-        {text}
-      </PopoverContent>
-    </Popover>
-  );
+interface Despesa {
+  id_empenho: string;
+  categoria: string | null;
+  favorecido: string | null;
+  valor: number | null;
+  data_despesa: string | null;
+  fonte_tabela: string | null;
 }
 
-const SOURCE_TEXT =
-  "Fonte: Portal da Transparência da CGU via API de Dados Abertos. Dados sincronizados conforme a Lei de Acesso à Informação.";
+const COLORS = ["#10b981", "#34d399", "#6ee7b7", "#059669", "#047857", "#065f46"];
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-2">
-      <h2 className="text-lg font-semibold tracking-tight text-foreground">
-        {children}
-      </h2>
-      <InfoPop text={SOURCE_TEXT} />
-    </div>
-  );
-}
+const fmt = (n: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
 
-const FILTERS = ["Hoje", "Este Mês", "Este Ano"] as const;
-type Filter = (typeof FILTERS)[number];
+function HomePage() {
+  const [despesas, setDespesas] = useState<Despesa[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-function Dashboard() {
-  const [filter, setFilter] = useState<Filter>("Este Mês");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  useEffect(() => {
+    // log access
+    supabase.from("log_acessos").insert({}).then(() => {});
 
-  const total = transactions.reduce((s, t) => s + t.valor, 0);
-  const totalDiarias = transactions
-    .filter((t) => t.categoria === "Diárias e Passagens")
-    .reduce((s, t) => s + t.valor, 0);
-  const saldoProjetos = 250000 - total;
-
-  const byCategory = useMemo(() => {
-    const m = new Map<string, number>();
-    transactions.forEach((t) =>
-      m.set(t.categoria, (m.get(t.categoria) ?? 0) + t.valor),
-    );
-    return Array.from(m, ([name, value]) => ({ name, value }));
+    supabase
+      .from("despesas_cfn")
+      .select("id_empenho, categoria, favorecido, valor, data_despesa, fonte_tabela")
+      .order("data_despesa", { ascending: false })
+      .limit(500)
+      .then(({ data }) => {
+        setDespesas((data as Despesa[]) ?? []);
+        setLoading(false);
+      });
   }, []);
 
-  const byCargo = useMemo(() => {
-    const m = new Map<string, Transaction[]>();
-    transactions.forEach((t) => {
-      const arr = m.get(t.cargo) ?? [];
-      arr.push(t);
-      m.set(t.cargo, arr);
-    });
-    return Array.from(m, ([cargo, items]) => {
-      const totalCargo = items.reduce((s, t) => s + t.valor, 0);
-      const top = [...items].sort((a, b) => b.valor - a.valor)[0];
-      return { cargo, total: totalCargo, top: top.categoria, items };
-    });
-  }, []);
-
-  const summary = [
-    {
-      label: "Gasto Total Mensal",
-      value: BRL(total),
-      icon: Wallet,
-    },
-    {
-      label: "Total em Diárias",
-      value: BRL(totalDiarias),
-      icon: Plane,
-    },
-    {
-      label: "Saldo de Projetos",
-      value: BRL(saldoProjetos),
-      icon: Briefcase,
-    },
-  ];
+  const { porCategoria, total, maiorCat } = useMemo(() => {
+    const map = new Map<string, number>();
+    let t = 0;
+    for (const d of despesas) {
+      const v = Number(d.valor ?? 0);
+      const c = d.categoria || "Sem categoria";
+      map.set(c, (map.get(c) ?? 0) + v);
+      t += v;
+    }
+    const arr = Array.from(map.entries())
+      .map(([categoria, valor]) => ({ categoria, valor }))
+      .sort((a, b) => b.valor - a.valor);
+    return { porCategoria: arr, total: t, maiorCat: arr[0] };
+  }, [despesas]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-28 animate-in fade-in duration-300">
-      <header className="border-b border-border bg-card/60 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-5 md:px-8">
+    <main className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background pb-24">
+      {/* Header */}
+      <header className="border-b bg-card/70 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-              <ShieldCheck className="h-6 w-6" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md">
+              <Leaf className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight md:text-2xl">
+              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
                 Portal de Transparência CFN
               </h1>
-              <p className="text-xs text-muted-foreground md:text-sm">
-                Gestão de Recursos e Prestação de Contas para a Categoria
+              <p className="text-xs text-muted-foreground">
+                Conselho Federal de Nutricionistas — dados abertos
               </p>
             </div>
           </div>
-          <div className="hidden items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground md:flex">
-            <Calendar className="h-3.5 w-3.5" />
-            Atualizado hoje
-          </div>
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/admin">
+              <Lock className="mr-1 h-4 w-4" /> Admin
+            </Link>
+          </Button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 md:px-8">
-        {/* Filters */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <SectionTitle>Visão Geral</SectionTitle>
-          <div className="inline-flex rounded-full border border-border bg-card p-1 shadow-sm">
-            {FILTERS.map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={cn(
-                  "rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
-                  filter === f
-                    ? "bg-primary text-primary-foreground shadow"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Summary cards */}
-        <section className="grid gap-4 md:grid-cols-3">
-          {summary.map(({ label, value, icon: Icon }) => (
-            <Card
-              key={label}
-              className="rounded-2xl border-border/70 shadow-sm"
-            >
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {label}
-                </CardTitle>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-                  <Icon className="h-4 w-4" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold tracking-tight">{value}</div>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+        {/* Cards resumo */}
+        <section className="grid gap-4 sm:grid-cols-3">
+          <SummaryCard
+            label="Total empenhado"
+            value={fmt(total)}
+            icon={TrendingUp}
+          />
+          <SummaryCard
+            label="Empenhos registrados"
+            value={String(despesas.length)}
+            icon={Receipt}
+          />
+          <SummaryCard
+            label="Maior categoria"
+            value={maiorCat?.categoria ?? "—"}
+            sub={maiorCat ? fmt(maiorCat.valor) : ""}
+            icon={PieIcon}
+          />
         </section>
 
-        {/* Donut + Cargo */}
-        <section className="grid gap-6 lg:grid-cols-5">
-          <Card className="rounded-2xl border-border/70 shadow-sm lg:col-span-2">
+        {/* Gráfico de barras */}
+        <Card className="border-primary/10 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Gastos por categoria
+              <DataSourceInfo
+                table="despesas_cfn"
+                description="Soma do campo valor agrupado por categoria."
+                columns={["categoria", "valor"]}
+              />
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="h-[340px]">
+            {loading ? (
+              <p className="text-sm text-muted-foreground">Carregando…</p>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={porCategoria.slice(0, 8)} margin={{ left: 10, right: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                  <XAxis dataKey="categoria" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={70} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip
+                    formatter={(v: number) => fmt(v)}
+                    contentStyle={{ borderRadius: 12, border: "1px solid hsl(var(--border))" }}
+                  />
+                  <Bar dataKey="valor" fill="#10b981" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Pizza + Tabela */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card className="border-primary/10 shadow-sm">
             <CardHeader>
-              <SectionTitle>Despesas por Categoria</SectionTitle>
+              <CardTitle className="flex items-center gap-2">
+                Distribuição de gastos
+                <DataSourceInfo
+                  table="despesas_cfn"
+                  description="Participação percentual de cada categoria sobre o total."
+                  columns={["categoria", "valor"]}
+                />
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="h-64 w-full">
+            <CardContent className="h-[300px]">
+              {loading ? (
+                <p className="text-sm text-muted-foreground">Carregando…</p>
+              ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={byCategory}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={55}
+                      data={porCategoria.slice(0, 6)}
+                      dataKey="valor"
+                      nameKey="categoria"
+                      cx="50%"
+                      cy="50%"
                       outerRadius={90}
-                      paddingAngle={3}
-                      stroke="var(--color-background)"
-                      strokeWidth={2}
+                      label={(e) => `${((e.percent ?? 0) * 100).toFixed(0)}%`}
                     >
-                      {byCategory.map((_, i) => (
-                        <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+                      {porCategoria.slice(0, 6).map((_, i) => (
+                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
                       ))}
                     </Pie>
-                    <RTooltip
-                      formatter={(v: number) => BRL(v)}
-                      contentStyle={{
-                        backgroundColor: "var(--color-popover)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 12,
-                        color: "var(--color-popover-foreground)",
-                      }}
-                    />
+                    <Tooltip formatter={(v: number) => fmt(v)} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
-              </div>
-              <ul className="mt-4 space-y-2">
-                {byCategory.map((c, i) => (
-                  <li
-                    key={c.name}
-                    className="flex items-center justify-between text-sm"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: PALETTE[i % PALETTE.length] }}
-                      />
-                      <span className="text-muted-foreground">{c.name}</span>
-                    </span>
-                    <span className="font-medium">
-                      {((c.value / total) * 100).toFixed(1)}%
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              )}
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border-border/70 shadow-sm lg:col-span-3">
+          <Card className="border-primary/10 shadow-sm">
             <CardHeader>
-              <SectionTitle>Detalhamento por Função/Cargo</SectionTitle>
+              <CardTitle className="flex items-center gap-2">
+                Despesas recentes
+                <DataSourceInfo
+                  table="despesas_cfn"
+                  description="Últimas despesas registradas, ordenadas por data."
+                  columns={["data_despesa", "categoria", "favorecido", "valor"]}
+                />
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {byCargo.map((c) => {
-                const open = expanded === c.cargo;
-                return (
-                  <div
-                    key={c.cargo}
-                    className="rounded-2xl border border-border/70 bg-card transition-shadow hover:shadow-sm"
-                  >
-                    <button
-                      onClick={() => setExpanded(open ? null : c.cargo)}
-                      className="flex w-full items-center justify-between gap-3 p-4 text-left"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-                          <Building2 className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="font-semibold">{c.cargo}</div>
-                          <span className="mt-0.5 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                            Maior gasto: {c.top}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-right">
-                          <div className="text-xs text-muted-foreground">
-                            Total
-                          </div>
-                          <div className="font-semibold">{BRL(c.total)}</div>
-                        </div>
-                        <ChevronDown
-                          className={cn(
-                            "h-4 w-4 text-muted-foreground transition-transform",
-                            open && "rotate-180",
-                          )}
-                        />
-                      </div>
-                    </button>
-                    {open && (
-                      <div className="border-t border-border/70 px-4 py-3 text-sm text-muted-foreground space-y-2">
-                        {c.items.map((it) => (
-                          <div key={it.id} className="flex gap-2">
-                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                            <div>
-                              <div className="text-foreground">
-                                {it.descricao}
-                              </div>
-                              <div className="text-xs">
-                                {it.origem} · {BRL(it.valor)}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Favorecido</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {despesas.slice(0, 8).map((d) => (
+                      <TableRow key={d.id_empenho}>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {d.data_despesa
+                            ? new Date(d.data_despesa).toLocaleDateString("pt-BR")
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="bg-primary/10 text-primary">
+                            {d.categoria ?? "—"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">{d.favorecido ?? "—"}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {fmt(Number(d.valor ?? 0))}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
-        </section>
-
-        {/* Transactions extract */}
-        <Card className="rounded-2xl border-border/70 shadow-sm">
-          <CardHeader>
-            <SectionTitle>Extrato de Transações</SectionTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="divide-y divide-border/70">
-              {transactions.map((t) => {
-                const Icon = CATEGORY_ICONS[t.categoria] ?? Wallet;
-                return (
-                  <li
-                    key={t.id}
-                    className="flex items-center gap-4 py-3 first:pt-0 last:pb-0"
-                  >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium text-foreground">
-                        {t.favorecido}
-                      </div>
-                      <div className="truncate text-xs text-muted-foreground">
-                        {t.categoria} ·{" "}
-                        {new Date(t.data).toLocaleDateString("pt-BR")}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-semibold">{BRL(t.valor)}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {t.cargo}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </CardContent>
-        </Card>
-      </main>
-
-      <footer className="mt-8 border-t border-border bg-card/60">
-        <div className="mx-auto flex max-w-7xl items-start gap-3 px-4 py-5 md:px-8">
-          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Este aplicativo opera em conformidade com a Lei de Acesso à
-            Informação (Lei 12.527/2011) e respeita as diretrizes da LGPD (Lei
-            13.709/2018). Os dados aqui apresentados são de natureza pública e
-            não expõem dados sensíveis de pessoas físicas além do permitido por
-            lei.
-          </p>
         </div>
-      </footer>
-      <BottomNav />
-    </div>
+
+        {/* Comentários */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold">Comentários da comunidade</h2>
+            <DataSourceInfo
+              table="comentarios_nutri"
+              description="Comentários enviados por nutricionistas. Apenas registros visíveis aparecem aqui."
+              columns={["nome", "crn", "comentario", "status_moderacao"]}
+            />
+          </div>
+
+          <CommentForm onPosted={() => setRefreshKey((k) => k + 1)} />
+          <CommentList refreshKey={refreshKey} />
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <Card className="border-primary/10 shadow-sm transition-shadow hover:shadow-md">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Icon className="h-4 w-4" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="truncate text-2xl font-bold text-foreground">{value}</p>
+        {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
+      </CardContent>
+    </Card>
   );
 }
