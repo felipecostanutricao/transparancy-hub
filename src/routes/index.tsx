@@ -28,7 +28,7 @@ import {
 import { DataSourceInfo } from "@/components/DataSourceInfo";
 import { CommentForm } from "@/components/CommentForm";
 import { CommentList } from "@/components/CommentList";
-import { ShieldCheck, TrendingUp, Receipt, PieChart as PieIcon, Lock } from "lucide-react";
+import { ShieldCheck, TrendingUp, Receipt, PieChart as PieIcon, Lock, Info } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -60,6 +60,7 @@ function HomePage() {
   const [despesas, setDespesas] = useState<Despesa[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string | null>(null);
 
   useEffect(() => {
     // log access
@@ -73,6 +74,16 @@ function HomePage() {
       .then(({ data }) => {
         setDespesas((data as Despesa[]) ?? []);
         setLoading(false);
+      });
+
+    supabase
+      .from("despesas_cfn")
+      .select("atualizado_em")
+      .order("atualizado_em", { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        const d = data?.[0]?.atualizado_em;
+        if (d) setUltimaAtualizacao(d);
       });
   }, []);
 
@@ -118,6 +129,16 @@ function HomePage() {
       </header>
 
       <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Info className="h-4 w-4 text-primary" />
+          <span>
+            Base atualizada em:{" "}
+            {ultimaAtualizacao
+              ? new Date(ultimaAtualizacao).toLocaleString("pt-BR")
+              : "—"}
+          </span>
+        </div>
+
         {/* Cards resumo */}
         <section className="grid gap-4 sm:grid-cols-3">
           <SummaryCard
