@@ -33,9 +33,9 @@ import { Leaf, TrendingUp, Receipt, PieChart as PieIcon, Lock } from "lucide-rea
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Portal de Transparência CFN" },
-      { name: "description", content: "Acompanhe as despesas do Conselho Federal de Nutricionistas com transparência radical." },
-      { property: "og:title", content: "Portal de Transparência CFN" },
+      { title: "AuditaCFN" },
+      { name: "description", content: "Por Nutricionistas e Para Nutricionistas." },
+      { property: "og:title", content: "AuditaCFN" },
       { property: "og:description", content: "Despesas, comentários da comunidade e dados abertos do CFN." },
     ],
   }),
