@@ -5,6 +5,15 @@ import { UploadCloud, CheckCircle2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface Row {
   id_empenho: string;
@@ -18,7 +27,13 @@ interface Row {
 interface Result {
   novos: number;
   atualizados: number;
+  totalLinhas: number;
+  valorTotal: number;
+  primeirosNovos: Row[];
 }
+
+const fmtBRL = (n: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
 
 export function CsvUpload() {
   const [processing, setProcessing] = useState(false);
@@ -65,7 +80,15 @@ export function CsvUpload() {
 
           const atualizados = rows.filter((r) => existingSet.has(r.id_empenho)).length;
           const novos = rows.length - atualizados;
-          setResult({ novos, atualizados });
+          const novosRows = rows.filter((r) => !existingSet.has(r.id_empenho));
+          const valorTotal = rows.reduce((sum, r) => sum + (Number(r.valor) || 0), 0);
+          setResult({
+            novos,
+            atualizados,
+            totalLinhas: rows.length,
+            valorTotal,
+            primeirosNovos: novosRows.slice(0, 5),
+          });
           toast.success("CSV processado com sucesso");
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Erro no upload";
@@ -124,6 +147,70 @@ export function CsvUpload() {
             {result.novos} novos empenhos adicionados, {result.atualizados} empenhos atualizados.
           </AlertDescription>
         </Alert>
+      )}
+
+      {result && (
+        <Card className="border-primary/10">
+          <CardHeader>
+            <CardTitle className="text-base">Resumo do último upload</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-xl border bg-card p-4">
+                <p className="text-xs text-muted-foreground">Linhas processadas</p>
+                <p className="mt-1 text-2xl font-bold">{result.totalLinhas}</p>
+              </div>
+              <div className="rounded-xl border bg-card p-4">
+                <p className="text-xs text-muted-foreground">Valor total do upload</p>
+                <p className="mt-1 text-2xl font-bold">{fmtBRL(result.valorTotal)}</p>
+              </div>
+              <div className="rounded-xl border bg-card p-4">
+                <p className="text-xs text-muted-foreground">Novos / Atualizados</p>
+                <p className="mt-1 text-2xl font-bold">
+                  {result.novos} <span className="text-sm text-muted-foreground">/ {result.atualizados}</span>
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm font-medium">
+                Primeiros 5 registros novos detectados
+              </p>
+              {result.primeirosNovos.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Nenhum registro novo neste upload.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID Empenho</TableHead>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead>Favorecido</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {result.primeirosNovos.map((r) => (
+                        <TableRow key={r.id_empenho}>
+                          <TableCell className="font-mono text-xs">{r.id_empenho}</TableCell>
+                          <TableCell className="text-xs">{r.data_despesa ?? "—"}</TableCell>
+                          <TableCell className="text-xs">{r.categoria ?? "—"}</TableCell>
+                          <TableCell className="text-xs">{r.favorecido ?? "—"}</TableCell>
+                          <TableCell className="text-right font-mono text-xs">
+                            {fmtBRL(Number(r.valor ?? 0))}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
