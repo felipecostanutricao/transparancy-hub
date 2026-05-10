@@ -102,10 +102,10 @@ function HomePage() {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-                Portal de Transparência CFN
+                AuditaCFN
               </h1>
               <p className="text-xs text-muted-foreground">
-                Conselho Federal de Nutricionistas — dados abertos
+                Por Nutricionistas e Para Nutricionistas.
               </p>
             </div>
           </div>
