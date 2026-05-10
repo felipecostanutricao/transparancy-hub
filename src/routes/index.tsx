@@ -75,6 +75,16 @@ function HomePage() {
         setDespesas((data as Despesa[]) ?? []);
         setLoading(false);
       });
+
+    supabase
+      .from("despesas_cfn")
+      .select("atualizado_em")
+      .order("atualizado_em", { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        const d = data?.[0]?.atualizado_em;
+        if (d) setUltimaAtualizacao(d);
+      });
   }, []);
 
   const { porCategoria, total, maiorCat } = useMemo(() => {
