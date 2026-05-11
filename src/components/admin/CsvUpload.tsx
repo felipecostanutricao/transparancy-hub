@@ -153,16 +153,101 @@ export function CsvUpload() {
       }
     };
 
+    const parseMoney = (v: unknown): number | null => {
+      if (v == null || v === "") return null;
+      if (typeof v === "number") return v;
+      const s = String(v)
+        .replace(/R\$\s?/gi, "")
+        .replace(/\s/g, "")
+        .replace(/\./g, "")
+        .replace(",", ".")
+        .replace(/[^0-9.\-]/g, "");
+      const n = Number(s);
+      return Number.isNaN(n) ? null : n;
+    };
+
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext === "xlsx") {
       try {
         const buf = await file.arrayBuffer();
         const wb = XLSX.read(buf, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
-        await processRows(json);
+        const matrix = XLSX.utils.sheet_to_json<unknown[]>(ws, {
+          header: 1,
+          defval: null,
+          blankrows: false,
+        });
+
+        // Find header row dynamically: first row containing "Despesa" or "Receita"
+        let headerIdx = -1;
+        for (let i = 0; i < matrix.length; i++) {
+          const row = (matrix[i] ?? []).map((c) =>
+            c == null ? "" : String(c).toLowerCase(),
+          );
+          if (row.some((c) => /despesa|receita/.test(c))) {
+            headerIdx = i;
+            break;
+          }
+        }
+        if (headerIdx === -1) {
+          toast.error("Cabeçalho não encontrado (procurado: 'Despesa' ou 'Receita').");
+          setProcessing(false);
+          return;
+        }
+
+        const headers = (matrix[headerIdx] as unknown[]).map((h) =>
+          h == null ? "" : String(h).trim(),
+        );
+        const catIdx = headers.findIndex((h) => /despesa|receita/i.test(h));
+        const valIdx = headers.findIndex((h) =>
+          /realiz\.?\s*(exerc|per[ií]odo)/i.test(h),
+        );
+
+        const today = new Date().toISOString().slice(0, 10);
+        const rows: Row[] = [];
+        for (let i = headerIdx + 1; i < matrix.length; i++) {
+          const r = matrix[i] as unknown[];
+          if (!r) continue;
+          const categoria = catIdx >= 0 && r[catIdx] != null ? String(r[catIdx]).trim() : "";
+          if (!categoria) continue;
+          const valor = valIdx >= 0 ? parseMoney(r[valIdx]) : null;
+          if (valor == null) continue;
+          rows.push({
+            id_empenho: crypto.randomUUID(),
+            data_despesa: today,
+            categoria,
+            favorecido: "Resumo CFN",
+            valor,
+            fonte_tabela: "Transparência CFN",
+          });
+        }
+
+        if (rows.length === 0) {
+          toast.error("Nenhuma linha válida encontrada após o cabeçalho.");
+          setProcessing(false);
+          return;
+        }
+
+        const { error } = await supabase
+          .from("despesas_cfn")
+          .upsert(rows, { onConflict: "id_empenho" });
+        if (error) throw error;
+
+        const valorTotal = rows.reduce((s, r) => s + (Number(r.valor) || 0), 0);
+        setResult({
+          novos: rows.length,
+          atualizados: 0,
+          totalLinhas: rows.length,
+          valorTotal,
+          primeirosNovos: rows.slice(0, 5),
+        });
+        toast.success("Planilha XLSX processada");
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("despesas:updated"));
+        }
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Erro ao ler XLSX");
+      } finally {
         setProcessing(false);
       }
     } else {
