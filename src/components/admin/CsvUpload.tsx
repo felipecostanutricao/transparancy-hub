@@ -104,7 +104,12 @@ export function CsvUpload() {
                   ? String(r.favorecido)
                   : NA,
               valor: valorRaw != null && !Number.isNaN(valorRaw) ? valorRaw : 0,
-              fonte_tabela: r.fonte_tabela ? String(r.fonte_tabela) : fonteDetectada,
+              fonte_tabela:
+                r.fonte_tabela && String(r.fonte_tabela).trim() !== ""
+                  ? String(r.fonte_tabela)
+                  : fonteDetectada !== "csv_upload"
+                    ? fonteDetectada
+                    : "Transparência CFN",
             };
           });
 
@@ -164,7 +169,9 @@ export function CsvUpload() {
       Papa.parse<Record<string, string>>(file, {
         header: true,
         skipEmptyLines: true,
-        delimitersToGuess: [",", ";", "\t", "|"],
+        delimiter: ";",
+        delimitersToGuess: [";", ",", "\t", "|"],
+        transformHeader: (h) => normalizeKey(h),
         complete: ({ data }) => processRows(data),
         error: (err) => {
           toast.error(err.message);
